@@ -7,8 +7,8 @@
 
 ## 🔗 Project Links
 
-* **Live Interactive Demo:** [https://dodo-membrane-toy.vercel.app](https://dodo-membrane-toy.vercel.app) *(or your deployed URL)*
-* **Source Code:** [https://github.com/your-username/dodo-membrane-toy](https://github.com/your-username/dodo-membrane-toy)
+* **Live Interactive Demo:** [https://dodo-membrane-toy.vercel.app](https://dodo-membrane-toy.vercel.app)
+* **Source Code:** [https://github.com/utkarsh21123/dodo-membrane-toy](https://github.com/utkarsh21123/dodo-membrane-toy)
 
 ---
 
