@@ -8,8 +8,13 @@ import { UIOverlay } from './components/UIOverlay';
 export const App: React.FC = () => {
   const [mode, setMode] = useState<MembraneMode>('prismatic');
   const [substrateTheme, setSubstrateTheme] = useState<SubstrateTheme>('editorial');
+  const [customHeadline, setCustomHeadline] = useState<string>('Elastic Light');
+  const [customSubtext, setCustomSubtext] = useState<string>('The Tactile Anatomy of Refraction');
+  
   const [params, setParams] = useState<PhysicsParams>(PRESETS.prismatic.params);
   const [isMuted, setIsMuted] = useState<boolean>(() => localStorage.getItem('dodo_membrane_muted') === 'true');
+  const [isMicActive, setIsMicActive] = useState<boolean>(false);
+  const [isGyroEnabled, setIsGyroEnabled] = useState<boolean>(false);
 
   const [pulseTrigger, setPulseTrigger] = useState<number>(0);
   const [resetTrigger, setResetTrigger] = useState<number>(0);
@@ -46,6 +51,42 @@ export const App: React.FC = () => {
     }
   }, []);
 
+  // Live Microphone Audio Reactive toggle
+  const handleToggleMic = useCallback(async () => {
+    if (audioSynthRef.current) {
+      const active = await audioSynthRef.current.toggleMic();
+      setIsMicActive(active);
+    }
+  }, []);
+
+  // Gyroscope / Device Tilt Physics toggle
+  const handleToggleGyro = useCallback(async () => {
+    if (!isGyroEnabled) {
+      // Handle iOS 13+ permission request
+      if (typeof DeviceOrientationEvent !== 'undefined' && 'requestPermission' in DeviceOrientationEvent) {
+        try {
+          const permission = await (DeviceOrientationEvent as unknown as { requestPermission: () => Promise<string> }).requestPermission();
+          if (permission === 'granted') {
+            setIsGyroEnabled(true);
+          }
+        } catch (err) {
+          console.warn('Gyroscope permission error:', err);
+        }
+      } else {
+        setIsGyroEnabled(true);
+      }
+    } else {
+      setIsGyroEnabled(false);
+    }
+  }, [isGyroEnabled]);
+
+  // Update custom typography
+  const handleUpdateCustomText = useCallback((headline: string, subtext: string) => {
+    setCustomHeadline(headline);
+    setCustomSubtext(subtext);
+    setSubstrateTheme('custom');
+  }, []);
+
   // Pulse & Reset actions
   const handlePulse = useCallback(() => {
     setPulseTrigger((prev) => prev + 1);
@@ -58,7 +99,6 @@ export const App: React.FC = () => {
   // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept if user is typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
@@ -100,9 +140,13 @@ export const App: React.FC = () => {
       <MembraneCanvas
         mode={mode}
         substrateTheme={substrateTheme}
+        customHeadline={customHeadline}
+        customSubtext={customSubtext}
         params={params}
         audioSynth={audioSynthRef.current}
+        isGyroEnabled={isGyroEnabled}
         onTelemetryUpdate={setTelemetry}
+        onCustomImageDropped={() => setSubstrateTheme('custom')}
         pulseTrigger={pulseTrigger}
         resetTrigger={resetTrigger}
       />
@@ -112,12 +156,19 @@ export const App: React.FC = () => {
         onSelectMode={handleSelectMode}
         substrateTheme={substrateTheme}
         onSelectSubstrateTheme={setSubstrateTheme}
+        customHeadline={customHeadline}
+        customSubtext={customSubtext}
+        onUpdateCustomText={handleUpdateCustomText}
         params={params}
         onUpdateParams={handleUpdateParams}
         onReset={handleReset}
         onPulse={handlePulse}
         isMuted={isMuted}
         onToggleMute={handleToggleMute}
+        isMicActive={isMicActive}
+        onToggleMic={handleToggleMic}
+        isGyroEnabled={isGyroEnabled}
+        onToggleGyro={handleToggleGyro}
         telemetry={telemetry}
       />
     </main>

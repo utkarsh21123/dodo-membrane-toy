@@ -1,6 +1,7 @@
 /**
- * Zero-dependency Web Audio API Synthesizer for tactile physical haptics.
- * Synthesizes crystal strikes, viscous drags, elastic recoils, and resonant chimes.
+ * Web Audio API Synthesizer & Audio-Reactive FFT Engine.
+ * Synthesizes crystal strikes, viscous drags, elastic recoils, and resonant chimes,
+ * and analyzes live microphone FFT frequency bands to drive real-time wave physics.
  */
 export class AudioSynthesizer {
   private ctx: AudioContext | null = null;
@@ -12,12 +13,19 @@ export class AudioSynthesizer {
   private dragFilter: BiquadFilterNode | null = null;
   private dragGain: GainNode | null = null;
 
+  // Live Audio Reactive Microphone FFT
+  public isMicActive: boolean = false;
+  private micStream: MediaStream | null = null;
+  private micSource: MediaStreamAudioSourceNode | null = null;
+  private analyser: AnalyserNode | null = null;
+  private fftData: Uint8Array | null = null;
+
   constructor() {
     const saved = localStorage.getItem('dodo_membrane_muted');
     this.isMuted = saved === 'true';
   }
 
-  private init(): void {
+  public init(): void {
     if (this.ctx) return;
     try {
       const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -37,7 +45,6 @@ export class AudioSynthesizer {
   private setupContinuousDragSynth(): void {
     if (!this.ctx || !this.masterGain) return;
 
-    // 1-second looping noise buffer
     const bufferSize = this.ctx.sampleRate;
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -77,6 +84,80 @@ export class AudioSynthesizer {
   }
 
   /**
+   * Toggles live microphone audio stream for audio-reactive mode.
+   */
+  public async toggleMic(): Promise<boolean> {
+    this.init();
+    if (!this.ctx) return false;
+
+    if (this.ctx.state === 'suspended') {
+      await this.ctx.resume();
+    }
+
+    if (this.isMicActive) {
+      // Disable mic
+      if (this.micStream) {
+        this.micStream.getTracks().forEach((track) => track.stop());
+        this.micStream = null;
+      }
+      if (this.micSource) {
+        this.micSource.disconnect();
+        this.micSource = null;
+      }
+      this.isMicActive = false;
+      return false;
+    } else {
+      // Enable mic
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        this.micStream = stream;
+
+        const analyser = this.ctx.createAnalyser();
+        analyser.fftSize = 128;
+        analyser.smoothingTimeConstant = 0.75;
+        this.analyser = analyser;
+        this.fftData = new Uint8Array(analyser.frequencyBinCount);
+
+        const source = this.ctx.createMediaStreamSource(stream);
+        source.connect(analyser);
+        this.micSource = source;
+
+        this.isMicActive = true;
+        return true;
+      } catch (err) {
+        console.warn('Microphone access denied or unavailable:', err);
+        this.isMicActive = false;
+        return false;
+      }
+    }
+  }
+
+  /**
+   * Retrieves current FFT frequency spectrum energy levels.
+   */
+  public getAudioFrequencyData(): { bass: number; mid: number; treble: number; peak: number } | null {
+    if (!this.isMicActive || !this.analyser || !this.fftData) return null;
+
+    (this.analyser as unknown as { getByteFrequencyData: (arr: Uint8Array) => void }).getByteFrequencyData(this.fftData);
+    const bins = this.fftData;
+
+    let bassSum = 0;
+    for (let i = 0; i < 4; i++) bassSum += bins[i];
+    const bass = bassSum / (4 * 255);
+
+    let midSum = 0;
+    for (let i = 4; i < 16; i++) midSum += bins[i];
+    const mid = midSum / (12 * 255);
+
+    let trebleSum = 0;
+    for (let i = 16; i < 48; i++) trebleSum += bins[i];
+    const treble = trebleSum / (32 * 255);
+
+    const peak = Math.max(bass, mid, treble);
+    return { bass, mid, treble, peak };
+  }
+
+  /**
    * Modulates the continuous drag sound based on cursor speed.
    */
   public updateDragVelocity(velocity: number, isDragging: boolean): void {
@@ -110,14 +191,13 @@ export class AudioSynthesizer {
     const gain = this.ctx.createGain();
     const filter = this.ctx.createBiquadFilter();
 
-    // Fundamental + Crystal overtone
     const baseFreq = 480 + Math.random() * 40;
     osc1.type = 'sine';
     osc1.frequency.setValueAtTime(baseFreq, t);
     osc1.frequency.exponentialRampToValueAtTime(baseFreq * 0.85, t + 0.35);
 
     osc2.type = 'triangle';
-    osc2.frequency.setValueAtTime(baseFreq * 2.76, t); // Metallic non-harmonic ratio
+    osc2.frequency.setValueAtTime(baseFreq * 2.76, t);
 
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(2400, t);
@@ -177,8 +257,8 @@ export class AudioSynthesizer {
     const gain = this.ctx.createGain();
 
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(130.81, t); // C3
-    osc.frequency.exponentialRampToValueAtTime(65.41, t + 0.9); // C2
+    osc.frequency.setValueAtTime(130.81, t);
+    osc.frequency.exponentialRampToValueAtTime(65.41, t + 0.9);
 
     subOsc.type = 'sine';
     subOsc.frequency.setValueAtTime(65.41, t);
@@ -197,6 +277,9 @@ export class AudioSynthesizer {
   }
 
   public dispose(): void {
+    if (this.micStream) {
+      this.micStream.getTracks().forEach((track) => track.stop());
+    }
     if (this.noiseNode) {
       try { this.noiseNode.stop(); } catch { /* ignore */ }
     }

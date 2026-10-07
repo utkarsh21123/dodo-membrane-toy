@@ -17,6 +17,7 @@ uniform float u_refractionStrength;
 uniform float u_dispersionStrength;
 uniform float u_specularPower;
 uniform float u_fresnelPower;
+uniform float u_causticStrength;
 
 // Pseudo-random noise for frosted blur & micro-grain
 float hash(vec2 p) {
@@ -56,6 +57,11 @@ void main() {
   vec3 normal = normalize(vec3(-grad.x, -grad.y, 1.0));
   vec3 viewDir = vec3(0.0, 0.0, 1.0);
 
+  // Optical Caustics: Divergence / Laplacian of surface height
+  float laplacian = (hL + hR + hU + hD - 4.0 * height) * 4.0;
+  float causticLight = pow(max(0.0, laplacian * 2.8), 1.8) * u_causticStrength;
+  float causticShadow = clamp(1.0 - max(0.0, -laplacian * 1.5) * 0.45, 0.4, 1.0);
+
   // Optical Snell's Refraction with Cauchy Chromatic Dispersion
   vec2 refrDir = normal.xy;
   
@@ -76,6 +82,9 @@ void main() {
   float subG = texture(u_substrate, uvG).g;
   float subB = texture(u_substrate, uvB).b;
   vec3 refractedColor = vec3(subR, subG, subB);
+
+  // Apply optical caustic modulation to substrate
+  refractedColor = refractedColor * causticShadow + vec3(1.0, 0.97, 0.92) * causticLight * 0.45;
 
   // Dynamic light source at cursor position
   vec3 lightPos = vec3(u_pointer.x, u_pointer.y, 0.35);

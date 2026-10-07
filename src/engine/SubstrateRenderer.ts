@@ -2,14 +2,20 @@ import { SubstrateTheme } from '../types';
 
 /**
  * Museum-Grade 2D Substrate Renderer.
- * Rasterizes crisp, high-DPI typographic lithographs and guilloché security geometry
- * to be refracted and dispersed through the WebGL2 elastic membrane.
+ * Rasterizes crisp, high-DPI typographic lithographs, guilloché geometry,
+ * custom interactive typography, and user-dropped images/SVGs.
  */
 export class SubstrateRenderer {
   public readonly canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   public width: number = 2048;
   public height: number = 2048;
+
+  // Custom User Substrate Content
+  public customHeadline: string = 'Elastic Light';
+  public customSubtext: string = 'THE TACTILE ANATOMY OF REFRACTION';
+  public customImage: HTMLImageElement | null = null;
+  public activeTheme: SubstrateTheme = 'editorial';
 
   constructor(width: number = 2048, height: number = 2048) {
     this.width = width;
@@ -26,6 +32,17 @@ export class SubstrateRenderer {
     this.render('editorial');
   }
 
+  public setCustomContent(headline: string, subtext: string): void {
+    this.customHeadline = headline || 'Elastic Light';
+    this.customSubtext = subtext || 'THE TACTILE ANATOMY OF REFRACTION';
+    this.render(this.activeTheme);
+  }
+
+  public setCustomImage(image: HTMLImageElement | null): void {
+    this.customImage = image;
+    this.render(this.activeTheme);
+  }
+
   public resize(width: number, height: number, theme: SubstrateTheme = 'editorial'): void {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     this.width = Math.max(1536, Math.floor(width * dpr));
@@ -35,7 +52,8 @@ export class SubstrateRenderer {
     this.render(theme);
   }
 
-  public render(theme: SubstrateTheme = 'editorial'): void {
+  public render(theme: SubstrateTheme = this.activeTheme): void {
+    this.activeTheme = theme;
     const ctx = this.ctx;
     const w = this.width;
     const h = this.height;
@@ -61,6 +79,9 @@ export class SubstrateRenderer {
       case 'geometric':
         this.renderGeometric(ctx, w, h);
         break;
+      case 'custom':
+        this.renderCustom(ctx, w, h);
+        break;
     }
 
     // Precision Swiss Corner Registration & Axis Markers
@@ -71,7 +92,7 @@ export class SubstrateRenderer {
     const cx = w * 0.5;
     const cy = h * 0.5;
 
-    // Subtle background architectural grid
+    // Background architectural grid
     ctx.strokeStyle = 'rgba(250, 248, 245, 0.03)';
     ctx.lineWidth = 1;
     const step = Math.floor(w / 24);
@@ -105,7 +126,7 @@ export class SubstrateRenderer {
     ctx.lineTo(w * 0.88, h * 0.205);
     ctx.stroke();
 
-    // Guilloché concentric background rings (subtle optical resonance)
+    // Guilloché concentric background rings
     const ringRadius = Math.min(w, h) * 0.32;
     for (let i = 1; i <= 6; i++) {
       ctx.strokeStyle = i % 2 === 0 ? 'rgba(250, 248, 245, 0.06)' : 'rgba(250, 248, 245, 0.025)';
@@ -115,17 +136,18 @@ export class SubstrateRenderer {
       ctx.stroke();
     }
 
-    // Super-graphic Editorial Typography
+    // Dynamic Display Typography (supports live custom text)
     ctx.fillStyle = '#FAF8F5';
-    ctx.font = `italic 400 ${Math.floor(w * 0.11)}px "Instrument Serif", Georgia, serif`;
+    const titleSize = this.customHeadline.length > 15 ? Math.floor(w * 0.075) : Math.floor(w * 0.11);
+    ctx.font = `italic 400 ${titleSize}px "Instrument Serif", Georgia, serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('Elastic Light', cx, cy - h * 0.04);
+    ctx.fillText(this.customHeadline, cx, cy - h * 0.04);
 
     // Secondary Modern Grotesk Subtitle
     ctx.fillStyle = 'rgba(250, 248, 245, 0.8)';
     ctx.font = `600 ${Math.floor(w * 0.016)}px "Syne", sans-serif`;
     ctx.letterSpacing = '5px';
-    ctx.fillText('THE TACTILE ANATOMY OF REFRACTION', cx, cy + h * 0.045);
+    ctx.fillText(this.customSubtext.toUpperCase(), cx, cy + h * 0.045);
 
     // Editorial Thesis Statement Paragraph
     ctx.fillStyle = 'rgba(250, 248, 245, 0.45)';
@@ -272,7 +294,7 @@ export class SubstrateRenderer {
     const cx = w * 0.5;
     const cy = h * 0.5;
 
-    // High-density precision optical vernier grid
+    // Optical vernier grid
     const maxR = Math.min(w, h) * 0.38;
     const rings = 12;
 
@@ -321,6 +343,57 @@ export class SubstrateRenderer {
     ctx.moveTo(cx, cy - maxR * 1.15);
     ctx.lineTo(cx, cy + maxR * 1.15);
     ctx.stroke();
+  }
+
+  private renderCustom(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+
+    if (this.customImage) {
+      // Render User-Dropped Image or SVG
+      const img = this.customImage;
+      const maxDim = Math.min(w, h) * 0.65;
+      let drawW = maxDim;
+      let drawH = maxDim;
+
+      if (img.width > img.height) {
+        drawH = (maxDim / img.width) * img.height;
+      } else {
+        drawW = (maxDim / img.height) * img.width;
+      }
+
+      const imgX = cx - drawW * 0.5;
+      const imgY = cy - drawH * 0.5;
+
+      // Outer aesthetic framing box
+      ctx.strokeStyle = 'rgba(250, 248, 245, 0.2)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(imgX - 12, imgY - 12, drawW + 24, drawH + 24);
+
+      // Draw custom user graphic
+      ctx.drawImage(img, imgX, imgY, drawW, drawH);
+
+      // Metadata Tag
+      ctx.fillStyle = 'rgba(250, 248, 245, 0.5)';
+      ctx.font = `500 ${Math.floor(w * 0.011)}px "IBM Plex Mono", monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText('USER SUBSTRATE ASSET // OPTICAL REFRACTION PASS', cx, imgY + drawH + 36);
+    } else {
+      // Custom Text Poster
+      ctx.fillStyle = '#FAF8F5';
+      ctx.font = `italic 400 ${Math.floor(w * 0.12)}px "Instrument Serif", Georgia, serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(this.customHeadline, cx, cy - 20);
+
+      ctx.fillStyle = 'rgba(250, 248, 245, 0.75)';
+      ctx.font = `600 ${Math.floor(w * 0.018)}px "Syne", sans-serif`;
+      ctx.letterSpacing = '6px';
+      ctx.fillText(this.customSubtext.toUpperCase(), cx, cy + 40);
+
+      ctx.fillStyle = 'rgba(250, 248, 245, 0.35)';
+      ctx.font = `400 ${Math.floor(w * 0.011)}px "IBM Plex Mono", monospace`;
+      ctx.fillText('DROP ANY IMAGE OR SVG FILE TO REFRACT IT LIVE', cx, cy + 90);
+    }
   }
 
   private renderFrameRegistration(ctx: CanvasRenderingContext2D, w: number, h: number): void {

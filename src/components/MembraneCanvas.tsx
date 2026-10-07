@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MembraneMode, SubstrateTheme, PhysicsParams, PointerState, InteractionTelemetry } from '../types';
 import { PhysicsGrid } from '../engine/PhysicsGrid';
 import { SubstrateRenderer } from '../engine/SubstrateRenderer';
@@ -8,9 +8,13 @@ import { AudioSynthesizer } from '../engine/AudioSynthesizer';
 interface MembraneCanvasProps {
   mode: MembraneMode;
   substrateTheme: SubstrateTheme;
+  customHeadline: string;
+  customSubtext: string;
   params: PhysicsParams;
   audioSynth: AudioSynthesizer;
+  isGyroEnabled: boolean;
   onTelemetryUpdate: (telemetry: InteractionTelemetry) => void;
+  onCustomImageDropped?: () => void;
   pulseTrigger: number;
   resetTrigger: number;
 }
@@ -18,13 +22,18 @@ interface MembraneCanvasProps {
 export const MembraneCanvas: React.FC<MembraneCanvasProps> = ({
   mode,
   substrateTheme,
+  customHeadline,
+  customSubtext,
   params,
   audioSynth,
+  isGyroEnabled,
   onTelemetryUpdate,
+  onCustomImageDropped,
   pulseTrigger,
   resetTrigger,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Engine references kept outside React state for 120fps performance
   const physicsRef = useRef<PhysicsGrid | null>(null);
@@ -46,9 +55,8 @@ export const MembraneCanvas: React.FC<MembraneCanvasProps> = ({
     lastActiveTime: Date.now(),
   });
 
-  const interactionModeRef = useRef<'IDLE' | 'HOVERING' | 'TUGGING' | 'RECOIL' | 'STRIKE' | 'PULSE'>('IDLE');
+  const interactionModeRef = useRef<'IDLE' | 'HOVERING' | 'TUGGING' | 'RECOIL' | 'STRIKE' | 'PULSE' | 'AUDIO_REACTIVE' | 'GYRO_SLOSH'>('IDLE');
 
-  // Mode indices for GLSL uniform
   const modeIndexMap: Record<MembraneMode, number> = {
     prismatic: 0,
     mercury: 1,
@@ -78,24 +86,50 @@ export const MembraneCanvas: React.FC<MembraneCanvasProps> = ({
     }
   }, [resetTrigger]);
 
-  // Substrate theme update effect
+  // Substrate theme and custom text updates
   useEffect(() => {
     if (substrateRef.current && shaderRef.current) {
+      substrateRef.current.setCustomContent(customHeadline, customSubtext);
       substrateRef.current.render(substrateTheme);
       shaderRef.current.updateSubstrate(substrateRef.current.canvas);
     }
-  }, [substrateTheme]);
+  }, [substrateTheme, customHeadline, customSubtext]);
+
+  // Device Orientation (Gyroscope Sloshing Physics)
+  useEffect(() => {
+    if (!isGyroEnabled) {
+      if (physicsRef.current) physicsRef.current.setGravity(0, 0);
+      return;
+    }
+
+    const handleOrientation = (e: DeviceOrientationEvent) => {
+      if (!physicsRef.current) return;
+      const gamma = e.gamma || 0; // Left-Right tilt [-90, 90]
+      const beta = e.beta || 0;   // Front-Back tilt [-180, 180]
+
+      const gx = Math.max(-1, Math.min(1, gamma / 45.0));
+      const gy = Math.max(-1, Math.min(1, (beta - 45) / 45.0)); // Assume ~45deg holding angle
+
+      physicsRef.current.setGravity(gx, gy);
+      if (Math.abs(gx) > 0.1 || Math.abs(gy) > 0.1) {
+        interactionModeRef.current = 'GYRO_SLOSH';
+      }
+    };
+
+    window.addEventListener('deviceorientation', handleOrientation);
+    return () => window.removeEventListener('deviceorientation', handleOrientation);
+  }, [isGyroEnabled]);
 
   // Initialize Canvas & Engine Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Instantiate engine components
     const physics = new PhysicsGrid(256, 256);
     physicsRef.current = physics;
 
     const substrate = new SubstrateRenderer(2048, 2048);
+    substrate.setCustomContent(customHeadline, customSubtext);
     substrate.render(substrateTheme);
     substrateRef.current = substrate;
 
@@ -117,7 +151,6 @@ export const MembraneCanvas: React.FC<MembraneCanvasProps> = ({
     let currentFps = 60;
     let currentFrameTime = 16.6;
 
-    // Handle Resize
     const handleResize = () => {
       if (!canvas) return;
       const dpr = Math.min(2.0, window.devicePixelRatio || 1);
@@ -133,7 +166,7 @@ export const MembraneCanvas: React.FC<MembraneCanvasProps> = ({
     window.addEventListener('resize', handleResize);
     handleResize();
 
-    // Main 120Hz Animation & Physics Loop
+    // Main 120Hz Animation Loop
     const renderLoop = (now: number) => {
       const dt = Math.min(32, now - lastTime);
       lastTime = now;
@@ -155,6 +188,15 @@ export const MembraneCanvas: React.FC<MembraneCanvasProps> = ({
         });
       }
 
+      // Audio-Reactive Wave Input
+      if (audioSynth.isMicActive) {
+        const audioData = audioSynth.getAudioFrequencyData();
+        if (audioData && audioData.peak > 0.08) {
+          physics.addAudioWave(audioData.bass, audioData.mid, audioData.treble);
+          interactionModeRef.current = 'AUDIO_REACTIVE';
+        }
+      }
+
       // Step physics simulation
       const currentParams = params;
       physics.step(currentParams, 1.0);
@@ -174,7 +216,7 @@ export const MembraneCanvas: React.FC<MembraneCanvasProps> = ({
         currentParams
       );
 
-      // Update Audio Synthesizer drag state
+      // Update Audio Synthesizer drag sound
       const speed = Math.hypot(pointer.vx, pointer.vy);
       audioSynth.updateDragVelocity(speed, pointer.isDragging);
 
@@ -183,7 +225,7 @@ export const MembraneCanvas: React.FC<MembraneCanvasProps> = ({
       pointer.vy *= 0.85;
 
       // State timeout to idle
-      if (!pointer.isDown && now - pointer.lastActiveTime > 800 && interactionModeRef.current !== 'IDLE') {
+      if (!pointer.isDown && now - pointer.lastActiveTime > 800 && !audioSynth.isMicActive && interactionModeRef.current !== 'IDLE') {
         interactionModeRef.current = 'IDLE';
       }
 
@@ -200,7 +242,7 @@ export const MembraneCanvas: React.FC<MembraneCanvasProps> = ({
       substrateRef.current = null;
       shaderRef.current = null;
     };
-  }, [mode, substrateTheme, params, audioSynth, onTelemetryUpdate]);
+  }, [mode, substrateTheme, customHeadline, customSubtext, params, audioSynth, onTelemetryUpdate]);
 
   // Pointer Event Handlers
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -224,7 +266,6 @@ export const MembraneCanvas: React.FC<MembraneCanvasProps> = ({
     p.dragStartY = normY;
     p.lastActiveTime = performance.now();
 
-    // Strike shockwave
     const strength = params.impulseStrength * (e.pressure > 0 ? e.pressure * 1.5 : 1.0);
     physicsRef.current.addImpulse(normX, normY, strength, 0.045);
     audioSynth.playStrike(strength);
@@ -255,7 +296,6 @@ export const MembraneCanvas: React.FC<MembraneCanvasProps> = ({
       if (dragDist > 0.006) {
         p.isDragging = true;
         interactionModeRef.current = 'TUGGING';
-        // Viscoelastic anchor pull
         physicsRef.current.setAnchor(
           p.dragStartX,
           p.dragStartY,
@@ -263,11 +303,9 @@ export const MembraneCanvas: React.FC<MembraneCanvasProps> = ({
           normY - p.dragStartY
         );
       }
-      // Continuous kinetic wake
       physicsRef.current.addWake(normX, normY, dx, dy, 1.2);
     } else {
       interactionModeRef.current = 'HOVERING';
-      // Subtle hover disturbance
       physicsRef.current.addWake(normX, normY, dx, dy, 0.35);
     }
   };
@@ -295,15 +333,62 @@ export const MembraneCanvas: React.FC<MembraneCanvasProps> = ({
     p.lastActiveTime = performance.now();
   };
 
+  // Drag & Drop Image/SVG onto Canvas
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            if (substrateRef.current && shaderRef.current) {
+              substrateRef.current.setCustomImage(img);
+              substrateRef.current.render('custom');
+              shaderRef.current.updateSubstrate(substrateRef.current.canvas);
+              if (onCustomImageDropped) onCustomImageDropped();
+            }
+          };
+          img.src = event.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  };
+
   return (
-    <canvas
-      ref={canvasRef}
-      className="membrane-canvas"
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      aria-label="Interactive refractive membrane canvas"
-    />
+    <div
+      className={`canvas-container ${isDragOver ? 'drag-target-active' : ''}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <canvas
+        ref={canvasRef}
+        className="membrane-canvas"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        aria-label="Interactive refractive membrane canvas"
+      />
+      {isDragOver && (
+        <div className="drop-overlay">
+          <span>DROP IMAGE OR SVG TO REFRACT</span>
+        </div>
+      )}
+    </div>
   );
 };

@@ -20,6 +20,7 @@ export class ShaderPipeline {
     dispersionStrength: WebGLUniformLocation | null;
     specularPower: WebGLUniformLocation | null;
     fresnelPower: WebGLUniformLocation | null;
+    causticStrength: WebGLUniformLocation | null;
     heightmap: WebGLUniformLocation | null;
     substrate: WebGLUniformLocation | null;
   };
@@ -68,6 +69,7 @@ export class ShaderPipeline {
       dispersionStrength: gl.getUniformLocation(program, 'u_dispersionStrength'),
       specularPower: gl.getUniformLocation(program, 'u_specularPower'),
       fresnelPower: gl.getUniformLocation(program, 'u_fresnelPower'),
+      causticStrength: gl.getUniformLocation(program, 'u_causticStrength'),
       heightmap: gl.getUniformLocation(program, 'u_heightmap'),
       substrate: gl.getUniformLocation(program, 'u_substrate'),
     };
@@ -212,6 +214,7 @@ export class ShaderPipeline {
     gl.uniform1f(this.uniformLocations.dispersionStrength, params.dispersionStrength);
     gl.uniform1f(this.uniformLocations.specularPower, params.specularPower);
     gl.uniform1f(this.uniformLocations.fresnelPower, params.fresnelPower);
+    gl.uniform1f(this.uniformLocations.causticStrength, params.causticStrength);
 
     gl.uniform1i(this.uniformLocations.heightmap, 0);
     gl.uniform1i(this.uniformLocations.substrate, 1);

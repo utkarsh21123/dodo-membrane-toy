@@ -1,19 +1,26 @@
 import React, { useState } from 'react';
 import { MembraneMode, SubstrateTheme, PhysicsParams, InteractionTelemetry } from '../types';
 import { PRESETS } from '../engine/presets';
-import { Volume2, VolumeX, RotateCcw, Sliders, Sparkles, Layers, Info, X } from 'lucide-react';
+import { Volume2, VolumeX, RotateCcw, Sliders, Sparkles, Layers, Info, X, Mic, MicOff, Smartphone, Type, Upload } from 'lucide-react';
 
 interface UIOverlayProps {
   mode: MembraneMode;
   onSelectMode: (mode: MembraneMode) => void;
   substrateTheme: SubstrateTheme;
   onSelectSubstrateTheme: (theme: SubstrateTheme) => void;
+  customHeadline: string;
+  customSubtext: string;
+  onUpdateCustomText: (headline: string, subtext: string) => void;
   params: PhysicsParams;
   onUpdateParams: (newParams: Partial<PhysicsParams>) => void;
   onReset: () => void;
   onPulse: () => void;
   isMuted: boolean;
   onToggleMute: () => void;
+  isMicActive: boolean;
+  onToggleMic: () => void;
+  isGyroEnabled: boolean;
+  onToggleGyro: () => void;
   telemetry: InteractionTelemetry;
 }
 
@@ -22,16 +29,27 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
   onSelectMode,
   substrateTheme,
   onSelectSubstrateTheme,
+  customHeadline,
+  customSubtext,
+  onUpdateCustomText,
   params,
   onUpdateParams,
   onReset,
   onPulse,
   isMuted,
   onToggleMute,
+  isMicActive,
+  onToggleMic,
+  isGyroEnabled,
+  onToggleGyro,
   telemetry,
 }) => {
   const [showSliders, setShowSliders] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [showTextEditor, setShowTextEditor] = useState(false);
+
+  const [editHeadline, setEditHeadline] = useState(customHeadline);
+  const [editSubtext, setEditSubtext] = useState(customSubtext);
 
   const modes: { id: MembraneMode; num: string; label: string }[] = [
     { id: 'prismatic', num: '01', label: 'Prismatic Glass' },
@@ -44,7 +62,15 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
     { id: 'editorial', label: 'Editorial' },
     { id: 'dodo_spec', label: 'Ledger Spec' },
     { id: 'geometric', label: 'Geometric' },
+    { id: 'custom', label: 'Custom' },
   ];
+
+  const handleApplyText = (e: React.FormEvent) => {
+    e.preventDefault();
+    onUpdateCustomText(editHeadline, editSubtext);
+    onSelectSubstrateTheme('custom');
+    setShowTextEditor(false);
+  };
 
   return (
     <div className="instrument-overlay pointer-events-none">
@@ -87,17 +113,17 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
       {showInfo && (
         <aside className="dialog-panel info-modal pointer-events-auto" role="dialog" aria-label="About Membrane">
           <div className="panel-header">
-            <span className="panel-tag">// SYSTEM OVERVIEW</span>
+            <span className="panel-tag">// SYSTEM ARCHITECTURE</span>
             <button onClick={() => setShowInfo(false)} className="panel-close" aria-label="Close dialog">
               <X size={14} />
             </button>
           </div>
-          <h3 className="panel-title">MEMBRANE &mdash; Elastic Optical Surface</h3>
+          <h3 className="panel-title">MEMBRANE &mdash; Elastic Optical Medium</h3>
           <p className="panel-text">
             A bespoke tactile visual medium engineered for Dodo Payments.
-            Combines a 2D discrete viscoelastic wave solver (9-point isotropic Laplacian)
-            with a custom WebGL2 fragment pipeline computing real-time Snell’s law refraction,
-            Cauchy chromatic dispersion, and synthesized acoustic haptics.
+            Features a 2D discrete viscoelastic wave solver (9-point isotropic Laplacian),
+            multi-layer optical caustic shadows, Snell’s law refraction, Cauchy chromatic dispersion,
+            spatial gyroscope gravity, audio-reactive FFT mic input, and custom drag-and-drop substrate graphics.
           </p>
           <div className="shortcuts-grid">
             <div className="shortcut-item"><kbd>Drag</kbd> <span>Tug & stretch elastic surface</span></div>
@@ -105,8 +131,72 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
             <div className="shortcut-item"><kbd>Space</kbd> <span>Harmonic standing pulse</span></div>
             <div className="shortcut-item"><kbd>1 – 4</kbd> <span>Switch material presets</span></div>
             <div className="shortcut-item"><kbd>M</kbd> <span>Toggle acoustic haptics</span></div>
-            <div className="shortcut-item"><kbd>R</kbd> <span>Reset to equilibrium</span></div>
+            <div className="shortcut-item"><kbd>R</kbd> <span>Reset equilibrium</span></div>
+            <div className="shortcut-item"><kbd>Drop</kbd> <span>Drag & drop any image/SVG file</span></div>
           </div>
+        </aside>
+      )}
+
+      {/* Interactive Typography Editor Dialog */}
+      {showTextEditor && (
+        <aside className="dialog-panel text-editor-panel pointer-events-auto" role="dialog" aria-label="Edit Substrate Typography">
+          <div className="panel-header">
+            <span className="panel-tag">// SUBSTRATE TYPOGRAPHY</span>
+            <button onClick={() => setShowTextEditor(false)} className="panel-close" aria-label="Close text editor">
+              <X size={14} />
+            </button>
+          </div>
+          <form onSubmit={handleApplyText} className="text-editor-form">
+            <div className="form-group">
+              <label htmlFor="headline-input">Headline</label>
+              <input
+                id="headline-input"
+                type="text"
+                value={editHeadline}
+                onChange={(e) => setEditHeadline(e.target.value)}
+                placeholder="e.g. Elastic Light"
+                maxLength={40}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="subtext-input">Subtext / Tagline</label>
+              <input
+                id="subtext-input"
+                type="text"
+                value={editSubtext}
+                onChange={(e) => setEditSubtext(e.target.value)}
+                placeholder="e.g. The Tactile Anatomy of Refraction"
+                maxLength={60}
+              />
+            </div>
+            <div className="editor-actions">
+              <label className="file-upload-btn" title="Upload Image or SVG">
+                <Upload size={12} />
+                <span>Upload Image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        const img = new Image();
+                        img.onload = () => {
+                          onSelectSubstrateTheme('custom');
+                          setShowTextEditor(false);
+                        };
+                        img.src = ev.target?.result as string;
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                />
+              </label>
+              <button type="submit" className="apply-btn">Apply to Canvas</button>
+            </div>
+          </form>
         </aside>
       )}
 
@@ -114,7 +204,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
       {showSliders && (
         <aside className="dialog-panel tuning-panel pointer-events-auto" aria-label="Parameter tuning drawer">
           <div className="panel-header">
-            <span className="panel-tag">// OPTICAL CALIBRATION</span>
+            <span className="panel-tag">// OPTICAL & PHYSICS CALIBRATION</span>
             <button onClick={() => setShowSliders(false)} className="panel-close" aria-label="Close drawer">
               <X size={14} />
             </button>
@@ -148,6 +238,21 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                 step="0.05"
                 value={params.tension}
                 onChange={(e) => onUpdateParams({ tension: parseFloat(e.target.value) })}
+              />
+            </div>
+
+            <div className="control-group">
+              <div className="control-label">
+                <span>Optical Caustics</span>
+                <span className="val-display">{params.causticStrength.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min="0.0"
+                max="3.0"
+                step="0.05"
+                value={params.causticStrength}
+                onChange={(e) => onUpdateParams({ causticStrength: parseFloat(e.target.value) })}
               />
             </div>
 
@@ -215,7 +320,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
           </div>
         </div>
 
-        {/* Substrate Switcher */}
+        {/* Substrate Selector */}
         <div className="substrate-dock" role="group" aria-label="Substrate Art Selection">
           <span className="dock-label"><Layers size={12} /> SUBSTRATE</span>
           <div className="dock-btns">
@@ -233,6 +338,40 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
 
         {/* Action Controls */}
         <div className="action-dock">
+          {/* Custom Typography Button */}
+          <button
+            onClick={() => setShowTextEditor(!showTextEditor)}
+            className={`dock-action-btn ${showTextEditor ? 'active' : ''}`}
+            title="Edit Substrate Typography & Graphics"
+            aria-label="Edit typography"
+          >
+            <Type size={13} />
+            <span>TYPE</span>
+          </button>
+
+          {/* Audio Reactive Mic */}
+          <button
+            onClick={onToggleMic}
+            className={`dock-action-btn ${isMicActive ? 'active' : ''}`}
+            title={isMicActive ? 'Disable Audio Reactive Microphone' : 'Enable Audio Reactive Microphone'}
+            aria-label="Toggle audio reactivity"
+          >
+            {isMicActive ? <Mic size={13} /> : <MicOff size={13} />}
+            <span>MIC</span>
+          </button>
+
+          {/* Gyroscope Tilt Physics */}
+          <button
+            onClick={onToggleGyro}
+            className={`dock-action-btn ${isGyroEnabled ? 'active' : ''}`}
+            title={isGyroEnabled ? 'Disable Gyroscope Gravity Slosh' : 'Enable Gyroscope Gravity Slosh'}
+            aria-label="Toggle gyroscope tilt"
+          >
+            <Smartphone size={13} />
+            <span>GYRO</span>
+          </button>
+
+          {/* Harmonic Pulse */}
           <button
             onClick={onPulse}
             className="dock-action-btn pulse-action"
@@ -244,15 +383,17 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
             <kbd className="dock-kbd">SPACE</kbd>
           </button>
 
+          {/* Tuning Sliders */}
           <button
             onClick={() => setShowSliders(!showSliders)}
             className={`dock-action-btn ${showSliders ? 'active' : ''}`}
-            title="Optical Calibration Sliders"
+            title="Optical & Physics Calibration"
             aria-label="Tune parameters"
           >
             <Sliders size={13} />
           </button>
 
+          {/* Sound Mute */}
           <button
             onClick={onToggleMute}
             className={`dock-action-btn ${isMuted ? 'muted' : ''}`}
@@ -262,6 +403,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
             {isMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
           </button>
 
+          {/* Reset */}
           <button
             onClick={onReset}
             className="dock-action-btn"
@@ -271,10 +413,11 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
             <RotateCcw size={13} />
           </button>
 
+          {/* Info */}
           <button
             onClick={() => setShowInfo(!showInfo)}
             className={`dock-action-btn ${showInfo ? 'active' : ''}`}
-            title="Documentation & Shortcuts"
+            title="System Documentation & Shortcuts"
             aria-label="About this toy"
           >
             <Info size={13} />

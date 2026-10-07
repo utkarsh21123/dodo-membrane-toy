@@ -1,18 +1,19 @@
 export type MembraneMode = 'prismatic' | 'mercury' | 'frosted' | 'iridescent';
 
-export type SubstrateTheme = 'editorial' | 'dodo_spec' | 'geometric';
+export type SubstrateTheme = 'editorial' | 'dodo_spec' | 'geometric' | 'custom';
 
 export interface PhysicsParams {
-  stiffness: number;       // Wave propagation speed (c^2)
-  damping: number;         // Energy dissipation factor (0.96 - 0.998)
-  viscosity: number;       // Spatial blur smoothing
-  tension: number;         // Elastic return strength
-  impulseStrength: number; // Click / tap strike power
+  stiffness: number;          // Wave propagation speed (c^2)
+  damping: number;            // Energy dissipation factor (0.96 - 0.998)
+  viscosity: number;          // Spatial blur smoothing
+  tension: number;            // Elastic return strength
+  impulseStrength: number;    // Click / tap strike power
   refractionStrength: number; // Optical distortion scale
   dispersionStrength: number; // Chromatic aberration (RGB split)
-  specularPower: number;   // Surface glossiness exponent
-  fresnelPower: number;    // Rim reflectance strength
-  ambientUndulation: number; // Subtle organic idle breathing
+  specularPower: number;      // Surface glossiness exponent
+  fresnelPower: number;       // Rim reflectance strength
+  ambientUndulation: number;  // Subtle organic idle breathing
+  causticStrength: number;    // Optical light concentration filaments
 }
 
 export interface PresetConfig {
@@ -43,5 +44,6 @@ export interface InteractionTelemetry {
   frameTimeMs: number;
   activeRipples: number;
   surfaceEnergy: number;
-  interactionMode: 'IDLE' | 'HOVERING' | 'TUGGING' | 'RECOIL' | 'STRIKE' | 'PULSE';
+  interactionMode: 'IDLE' | 'HOVERING' | 'TUGGING' | 'RECOIL' | 'STRIKE' | 'PULSE' | 'AUDIO_REACTIVE' | 'GYRO_SLOSH';
+  audioPeakLevel?: number;
 }

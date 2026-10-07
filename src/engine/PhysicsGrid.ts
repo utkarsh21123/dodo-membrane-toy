@@ -3,7 +3,8 @@ import { PhysicsParams } from '../types';
 /**
  * High-performance 2D Viscoelastic Wave Equation Solver.
  * Implements an isotropic 9-point discrete Laplacian kernel with
- * absorbing boundary damping, elastic anchor springs, and kinetic wake deposition.
+ * absorbing boundary damping, elastic anchor springs, spatial gravity sloshing,
+ * and audio-reactive harmonic impulses.
  */
 export class PhysicsGrid {
   public readonly width: number;
@@ -21,6 +22,10 @@ export class PhysicsGrid {
   private anchorGridY: number = 0;
   private anchorPullX: number = 0;
   private anchorPullY: number = 0;
+
+  // Spatial gravity acceleration vector from gyroscope
+  private gravityX: number = 0;
+  private gravityY: number = 0;
 
   // RGBA texture buffer for WebGL upload: R=Height, G=dH/dx, B=dH/dy, A=Energy
   public readonly textureData: Uint8Array;
@@ -52,6 +57,16 @@ export class PhysicsGrid {
     this.uNext.fill(0);
     this.isAnchorActive = false;
     this.surfaceEnergy = 0;
+    this.gravityX = 0;
+    this.gravityY = 0;
+  }
+
+  /**
+   * Sets the continuous gravitational acceleration vector from device orientation (gyro).
+   */
+  public setGravity(gx: number, gy: number): void {
+    this.gravityX = gx;
+    this.gravityY = gy;
   }
 
   /**
@@ -85,6 +100,29 @@ export class PhysicsGrid {
           this.uPrev[idx] -= impulse * 0.5; // Impart forward momentum
         }
       }
+    }
+  }
+
+  /**
+   * Audio-reactive harmonic wave injection based on FFT frequency bands.
+   */
+  public addAudioWave(bass: number, mid: number, treble: number): void {
+    if (bass > 0.15) {
+      // Bass pulses center shockwave
+      this.addImpulse(0.5, 0.5, bass * 0.8, 0.06);
+    }
+    if (mid > 0.25) {
+      // Mids inject harmonic orbiting nodes
+      const angle = this.idleTime * 3.0;
+      const r = 0.25;
+      this.addImpulse(0.5 + Math.cos(angle) * r, 0.5 + Math.sin(angle) * r, mid * 0.4, 0.035);
+      this.addImpulse(0.5 - Math.cos(angle) * r, 0.5 - Math.sin(angle) * r, mid * 0.4, 0.035);
+    }
+    if (treble > 0.35) {
+      // Treble injects micro-ripples
+      const rx = 0.2 + Math.random() * 0.6;
+      const ry = 0.2 + Math.random() * 0.6;
+      this.addImpulse(rx, ry, treble * 0.25, 0.02);
     }
   }
 
@@ -172,15 +210,28 @@ export class PhysicsGrid {
       const displacement = Math.hypot(this.anchorPullX, this.anchorPullY) * params.tension * 4.0;
 
       for (let y = minY; y <= maxY; y++) {
-        const dy = y - this.anchorGridY;
         const row = y * w;
         for (let x = minX; x <= maxX; x++) {
           const dx = x - this.anchorGridX;
+          const dy = y - this.anchorGridY;
           const dSq = dx * dx + dy * dy;
           if (dSq <= r * r) {
             const factor = Math.cos((Math.sqrt(dSq) / r) * (Math.PI * 0.5));
             this.uCurr[row + x] += displacement * factor * 0.25;
           }
+        }
+      }
+    }
+
+    // Apply spatial gravity slosh from tilt
+    if (Math.abs(this.gravityX) > 0.01 || Math.abs(this.gravityY) > 0.01) {
+      for (let y = 1; y < h - 1; y++) {
+        const normY = (y / h - 0.5) * 2.0;
+        const row = y * w;
+        for (let x = 1; x < w - 1; x++) {
+          const normX = (x / w - 0.5) * 2.0;
+          const tiltForce = (normX * this.gravityX + normY * this.gravityY) * 0.015;
+          this.uCurr[row + x] += tiltForce;
         }
       }
     }

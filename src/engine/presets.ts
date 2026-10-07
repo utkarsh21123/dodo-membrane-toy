@@ -17,6 +17,7 @@ export const PRESETS: Record<MembraneMode, PresetConfig> = {
       specularPower: 48.0,
       fresnelPower: 1.8,
       ambientUndulation: 0.008,
+      causticStrength: 1.5,
     },
   },
   mercury: {
@@ -35,6 +36,7 @@ export const PRESETS: Record<MembraneMode, PresetConfig> = {
       specularPower: 80.0,
       fresnelPower: 2.8,
       ambientUndulation: 0.012,
+      causticStrength: 0.8,
     },
   },
   frosted: {
@@ -53,6 +55,7 @@ export const PRESETS: Record<MembraneMode, PresetConfig> = {
       specularPower: 16.0,
       fresnelPower: 1.2,
       ambientUndulation: 0.004,
+      causticStrength: 0.4,
     },
   },
   iridescent: {
@@ -71,6 +74,7 @@ export const PRESETS: Record<MembraneMode, PresetConfig> = {
       specularPower: 64.0,
       fresnelPower: 3.2,
       ambientUndulation: 0.010,
+      causticStrength: 1.8,
     },
   },
 };
